@@ -1,6 +1,6 @@
 // SoftWake Service Worker — Offline + Push Notification
 
-var CACHE_NAME = 'softwake-v4';
+var CACHE_NAME = 'softwake-v5';
 var ASSETS = [
   '/',
   '/index.html',

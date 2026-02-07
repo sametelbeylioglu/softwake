@@ -76,7 +76,7 @@ var PushManager = (function () {
 
     var tzOffset = new Date().getTimezoneOffset();
     var utcAlarms = alarms.map(function (a) {
-      var totalMinutes = a.hour * 60 + a.minute - tzOffset;
+      var totalMinutes = a.hour * 60 + a.minute + tzOffset;
       if (totalMinutes < 0) totalMinutes += 1440;
       if (totalMinutes >= 1440) totalMinutes -= 1440;
 
