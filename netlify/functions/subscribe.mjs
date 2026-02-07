@@ -43,9 +43,10 @@ export default async (req) => {
 
     await store.set(key, JSON.stringify(record));
 
-    console.log("[subscribe] Kayıt başarılı:", key, "alarm sayısı:", (alarms || []).length);
+    const alarmCount = (alarms || []).length;
+    console.log("[subscribe] Kayıt başarılı:", key, "alarm sayısı:", alarmCount, "body keys:", Object.keys(body));
 
-    return new Response(JSON.stringify({ ok: true, key }), {
+    return new Response(JSON.stringify({ ok: true, key, receivedAlarms: alarmCount }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",

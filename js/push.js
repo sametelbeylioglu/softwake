@@ -112,7 +112,7 @@ var PushManager = (function () {
       }
 
       var result = JSON.parse(responseText);
-      report(utcAlarms.length + ' alarm kaydedildi ✓');
+      report('Gönderilen: ' + utcAlarms.length + ' / Sunucu aldı: ' + result.receivedAlarms);
       return result.ok;
 
     } catch (err) {

@@ -198,12 +198,9 @@
 
   function syncAlarmsToServer() {
     if (PushManager && PushManager.supported()) {
-      // İlk kez ise subscribe() izin ister (buton tıklaması bağlamında)
-      PushManager.syncAlarms(AlarmStore.getAll()).then(function (ok) {
-        if (ok) {
-          showToast('Alarm kaydedildi + bildirim aktif ✓');
-        }
-      });
+      var allAlarms = AlarmStore.getAll();
+      console.log('[SoftWake] Sync: ' + allAlarms.length + ' alarm gönderiliyor', JSON.stringify(allAlarms));
+      PushManager.syncAlarms(allAlarms);
     }
   }
 
