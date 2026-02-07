@@ -1,6 +1,6 @@
 // SoftWake Service Worker — Offline + Push Notification
 
-var CACHE_NAME = 'softwake-v2';
+var CACHE_NAME = 'softwake-v3';
 var ASSETS = [
   '/',
   '/index.html',
@@ -38,16 +38,26 @@ self.addEventListener('activate', function (e) {
   self.clients.claim();
 });
 
-// ── Fetch — önce cache, yoksa network ──
+// ── Fetch — önce network, yoksa cache (her zaman güncel) ──
 
 self.addEventListener('fetch', function (e) {
-  // API isteklerini cache'leme
-  if (e.request.url.includes('/api/')) return;
+  // API ve function isteklerini cache'leme
+  if (e.request.url.includes('/.netlify/') || e.request.url.includes('/api/')) return;
 
   e.respondWith(
-    caches.match(e.request).then(function (cached) {
-      return cached || fetch(e.request);
-    })
+    fetch(e.request)
+      .then(function (response) {
+        // Başarılıysa cache'i güncelle
+        var clone = response.clone();
+        caches.open(CACHE_NAME).then(function (cache) {
+          cache.put(e.request, clone);
+        });
+        return response;
+      })
+      .catch(function () {
+        // Offline ise cache'ten sun
+        return caches.match(e.request);
+      })
   );
 });
 
