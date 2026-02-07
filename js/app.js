@@ -194,13 +194,14 @@
     showScreen('list');
   }
 
-  // ── Push senkronizasyonu ──
+  // ── Push senkronizasyonu (kullanıcı eylemi ile tetiklenir) ──
 
   function syncAlarmsToServer() {
     if (PushManager && PushManager.supported()) {
+      // İlk kez ise subscribe() izin ister (buton tıklaması bağlamında)
       PushManager.syncAlarms(AlarmStore.getAll()).then(function (ok) {
         if (ok) {
-          console.log('[SoftWake] Alarmlar sunucuya senkronize edildi');
+          showToast('Alarm kaydedildi + bildirim aktif ✓');
         }
       });
     }
@@ -461,19 +462,6 @@
     PushManager.onStatus(function (msg) {
       showToast(msg);
     });
-  }
-
-  // Push notification aboneliğini başlat
-  if (PushManager && PushManager.supported()) {
-    PushManager.subscribe().then(function (sub) {
-      if (sub) {
-        syncAlarmsToServer();
-      } else {
-        showToast('Push bildirim etkinleştirilemedi');
-      }
-    });
-  } else {
-    showToast('Bu cihaz push bildirimi desteklemiyor');
   }
 
   // URL'den tetikleme kontrolü
