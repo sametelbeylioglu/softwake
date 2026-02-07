@@ -1,6 +1,6 @@
-// SoftWake Service Worker — Offline destek + PWA
+// SoftWake Service Worker — Offline + Push Notification
 
-var CACHE_NAME = 'softwake-v1';
+var CACHE_NAME = 'softwake-v2';
 var ASSETS = [
   '/',
   '/index.html',
@@ -8,11 +8,13 @@ var ASSETS = [
   '/js/store.js',
   '/js/engine.js',
   '/js/picker.js',
+  '/js/push.js',
   '/js/app.js',
   '/manifest.json'
 ];
 
-// Kurulum — dosyaları önbelleğe al
+// ── Kurulum — dosyaları önbelleğe al ──
+
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE_NAME).then(function (cache) {
@@ -22,7 +24,8 @@ self.addEventListener('install', function (e) {
   self.skipWaiting();
 });
 
-// Aktifleşme — eski önbellekleri temizle
+// ── Aktifleşme — eski önbellekleri temizle ──
+
 self.addEventListener('activate', function (e) {
   e.waitUntil(
     caches.keys().then(function (names) {
@@ -35,11 +38,84 @@ self.addEventListener('activate', function (e) {
   self.clients.claim();
 });
 
-// Fetch — önce cache, yoksa network
+// ── Fetch — önce cache, yoksa network ──
+
 self.addEventListener('fetch', function (e) {
+  // API isteklerini cache'leme
+  if (e.request.url.includes('/api/')) return;
+
   e.respondWith(
     caches.match(e.request).then(function (cached) {
       return cached || fetch(e.request);
     })
+  );
+});
+
+// ══════════════════════════════════════════
+// PUSH NOTIFICATION — arka plan bildirim
+// ══════════════════════════════════════════
+
+self.addEventListener('push', function (e) {
+  var data = {
+    title: 'SoftWake',
+    body: 'Yumuşak uyanış zamanı ☀️',
+    tag: 'softwake-alarm'
+  };
+
+  if (e.data) {
+    try {
+      data = Object.assign(data, e.data.json());
+    } catch (err) {
+      // JSON parse hatası — varsayılanları kullan
+    }
+  }
+
+  var options = {
+    body: data.body,
+    tag: data.tag,
+    icon: '/icons/icon.svg',
+    badge: '/icons/icon.svg',
+    vibrate: [200, 100, 200, 100, 200], // titreşim deseni
+    requireInteraction: true, // kullanıcı kapatana kadar kal
+    actions: [
+      { action: 'open', title: 'Aç' },
+      { action: 'dismiss', title: 'Kapat' }
+    ],
+    data: {
+      alarmId: data.alarmId,
+      url: '/'
+    }
+  };
+
+  e.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+// ── Bildirime tıklandığında ──
+
+self.addEventListener('notificationclick', function (e) {
+  e.notification.close();
+
+  if (e.action === 'dismiss') return;
+
+  // Uygulama açık mı kontrol et, açıksa odaklan, değilse aç
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then(function (clients) {
+        // Açık pencere varsa odaklan ve alarm başlat mesajı gönder
+        for (var i = 0; i < clients.length; i++) {
+          if (clients[i].url.includes(self.registration.scope)) {
+            clients[i].focus();
+            clients[i].postMessage({
+              type: 'ALARM_TRIGGERED',
+              alarmId: e.notification.data.alarmId
+            });
+            return;
+          }
+        }
+        // Açık pencere yoksa yeni pencere aç
+        return self.clients.openWindow('/?alarm=triggered');
+      })
   );
 });

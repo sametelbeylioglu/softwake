@@ -1,0 +1,26 @@
+{
+  "name": "softwake",
+  "version": "1.0.0",
+  "description": "Belirlenen saatte yumuşak frekanslarla **5 dakika boyunca kademeli uyandırıp otomatik kapanan** alarm.",
+  "main": "sw.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sametelbeylioglu/softwake.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/sametelbeylioglu/softwake/issues"
+  },
+  "homepage": "https://github.com/sametelbeylioglu/softwake#readme",
+  "dependencies": {
+    "@netlify/blobs": "^10.6.0",
+    "@netlify/functions": "^5.1.2",
+    "web-push": "^3.6.7"
+  }
+}

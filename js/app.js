@@ -99,6 +99,7 @@
     alarmListEl.querySelectorAll('input[data-toggle-id]').forEach(function (input) {
       input.addEventListener('change', function () {
         AlarmStore.toggle(this.dataset.toggleId);
+        syncAlarmsToServer();
       });
     });
 
@@ -173,6 +174,9 @@
       showToast('Alarm eklendi — ' + pad(hour) + ':' + pad(minute));
     }
 
+    // Push notification sunucusuna senkronize et
+    syncAlarmsToServer();
+
     showScreen('list');
   }
 
@@ -183,7 +187,23 @@
       AlarmStore.remove(editingAlarmId);
       showToast('Alarm silindi');
     }
+
+    // Push notification sunucusuna senkronize et
+    syncAlarmsToServer();
+
     showScreen('list');
+  }
+
+  // ── Push senkronizasyonu ──
+
+  function syncAlarmsToServer() {
+    if (PushManager && PushManager.supported()) {
+      PushManager.syncAlarms(AlarmStore.getAll()).then(function (ok) {
+        if (ok) {
+          console.log('[SoftWake] Alarmlar sunucuya senkronize edildi');
+        }
+      });
+    }
   }
 
   // ── Tekrar picker ──
@@ -395,6 +415,31 @@
   document.addEventListener('touchstart', unlockAudio, { once: true });
   document.addEventListener('click', unlockAudio, { once: true });
 
+  // ── Service Worker'dan gelen mesajları dinle (push notification tıklaması) ──
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', function (event) {
+      if (event.data && event.data.type === 'ALARM_TRIGGERED') {
+        console.log('[SoftWake] Push notification ile alarm tetiklendi');
+        showActiveAlarm();
+      }
+    });
+  }
+
+  // ── URL'den alarm tetikleme kontrolü (?alarm=triggered) ──
+
+  function checkURLTrigger() {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('alarm') === 'triggered') {
+      // URL'i temizle
+      history.replaceState(null, '', '/');
+      // Kısa gecikme ile ses motorunu başlat (UI hazır olsun)
+      setTimeout(function () {
+        showActiveAlarm();
+      }, 500);
+    }
+  }
+
   // ═══ Başlat ═══
 
   // Wheel picker'ları oluştur
@@ -408,11 +453,19 @@
   // Listeyi render et
   renderList();
 
-  // Alarm kontrol döngüsünü başlat
+  // Alarm kontrol döngüsünü başlat (ön plan kontrolü)
   startAlarmCheck();
 
-  // Bildirim izni
-  requestNotificationPermission();
+  // Push notification aboneliğini başlat
+  if (PushManager && PushManager.supported()) {
+    PushManager.subscribe().then(function () {
+      // Mevcut alarmları senkronize et
+      syncAlarmsToServer();
+    });
+  }
+
+  // URL'den tetikleme kontrolü
+  checkURLTrigger();
 
   // İlk ekranı göster
   showScreen('list');
