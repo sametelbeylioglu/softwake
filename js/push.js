@@ -1,20 +1,15 @@
 /* ═══════════════════════════════════════════════
    PushManager — Web Push Notification yönetimi
-   
-   Alarm arka planda (ekran kapalı) bile bildirim
-   gönderebilmek için push subscription yönetir.
    ═══════════════════════════════════════════════ */
 
 var PushManager = (function () {
   'use strict';
 
-  // VAPID Public Key (generate-vapid-keys ile üretildi)
   var VAPID_PUBLIC_KEY = 'BDfJT06cPx1KMKC34NAYEG0aZwSkLuBaKUGMUwxUPT6CONVeA25wAJ1MdAgB05QeKTxSuN3DUMgIvsgwVI5g9So';
 
   var subscription = null;
-  var isSupported = ('serviceWorker' in navigator) && ('PushManager' in window);
-
-  // ── VAPID key'i Uint8Array'e çevir ──
+  var isSupported = ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window);
+  var statusCallback = null;
 
   function urlBase64ToUint8Array(base64String) {
     var padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -31,38 +26,39 @@ var PushManager = (function () {
 
   async function subscribe() {
     if (!isSupported) {
-      console.warn('[Push] Bu tarayıcı push notification desteklemiyor');
+      report('Push desteklenmiyor');
       return null;
     }
 
     try {
-      // Service Worker hazır mı?
       var registration = await navigator.serviceWorker.ready;
+      report('Service Worker hazır');
 
-      // Mevcut subscription var mı?
+      // Mevcut subscription?
       subscription = await registration.pushManager.getSubscription();
 
       if (!subscription) {
-        // Bildirim izni iste
         var permission = await Notification.requestPermission();
+        report('Bildirim izni: ' + permission);
+
         if (permission !== 'granted') {
-          console.warn('[Push] Bildirim izni reddedildi');
           return null;
         }
 
-        // Yeni subscription oluştur
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
         });
 
-        console.log('[Push] Abone olundu');
+        report('Push aboneliği oluşturuldu ✓');
+      } else {
+        report('Mevcut push aboneliği bulundu ✓');
       }
 
       return subscription;
 
     } catch (err) {
-      console.error('[Push] Abonelik hatası:', err);
+      report('Push hatası: ' + err.message);
       return null;
     }
   }
@@ -73,13 +69,14 @@ var PushManager = (function () {
     if (!subscription) {
       subscription = await subscribe();
     }
-    if (!subscription) return false;
+    if (!subscription) {
+      report('Abonelik yok, senkronizasyon yapılamadı');
+      return false;
+    }
 
-    // Alarm saatlerini UTC'ye çevir
-    var tzOffset = new Date().getTimezoneOffset(); // dakika cinsinden (Türkiye: -180)
+    var tzOffset = new Date().getTimezoneOffset();
     var utcAlarms = alarms.map(function (a) {
       var totalMinutes = a.hour * 60 + a.minute - tzOffset;
-      // Negatif veya 24 saati aşan değerleri düzelt
       if (totalMinutes < 0) totalMinutes += 1440;
       if (totalMinutes >= 1440) totalMinutes -= 1440;
 
@@ -94,7 +91,8 @@ var PushManager = (function () {
     });
 
     try {
-      var response = await fetch('/api/subscribe', {
+      // Netlify Functions varsayılan yolu
+      var response = await fetch('/.netlify/functions/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -103,26 +101,40 @@ var PushManager = (function () {
         })
       });
 
+      if (!response.ok) {
+        var errText = await response.text();
+        report('Sunucu hatası: ' + response.status + ' — ' + errText);
+        return false;
+      }
+
       var result = await response.json();
-      console.log('[Push] Alarmlar senkronize edildi:', result);
+      report('Alarmlar sunucuya kaydedildi ✓');
       return result.ok;
 
     } catch (err) {
-      console.error('[Push] Senkronizasyon hatası:', err);
+      report('Senkronizasyon hatası: ' + err.message);
       return false;
     }
   }
-
-  // ── Destek kontrolü ──
 
   function supported() {
     return isSupported;
   }
 
+  function onStatus(fn) {
+    statusCallback = fn;
+  }
+
+  function report(msg) {
+    console.log('[Push] ' + msg);
+    if (statusCallback) statusCallback(msg);
+  }
+
   return {
     subscribe: subscribe,
     syncAlarms: syncAlarms,
-    supported: supported
+    supported: supported,
+    onStatus: onStatus
   };
 
 })();

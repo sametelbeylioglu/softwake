@@ -1,10 +1,20 @@
 // Alarm aboneliğini kaydet / güncelle
-// POST /api/subscribe
-// Body: { subscription: PushSubscription, alarms: Alarm[] }
+// POST /.netlify/functions/subscribe
 
 import { getStore } from "@netlify/blobs";
 
 export default async (req) => {
+  // CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      }
+    });
+  }
+
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
@@ -14,21 +24,28 @@ export default async (req) => {
     const { subscription, alarms } = body;
 
     if (!subscription || !subscription.endpoint) {
-      return new Response("Missing subscription", { status: 400 });
+      return new Response(JSON.stringify({ error: "Missing subscription" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
     }
 
     const store = getStore("softwake-alarms");
 
-    // Subscription endpoint'i key olarak kullan (URL-safe hash)
-    const key = btoa(subscription.endpoint).replace(/[/+=]/g, "_").slice(0, 64);
+    // Subscription endpoint'i key olarak kullan
+    const key = Buffer.from(subscription.endpoint).toString("base64url").slice(0, 64);
 
-    await store.set(key, JSON.stringify({
+    const record = {
       subscription,
       alarms: alarms || [],
       updatedAt: new Date().toISOString()
-    }));
+    };
 
-    return new Response(JSON.stringify({ ok: true }), {
+    await store.set(key, JSON.stringify(record));
+
+    console.log("[subscribe] Kayıt başarılı:", key, "alarm sayısı:", (alarms || []).length);
+
+    return new Response(JSON.stringify({ ok: true, key }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",
@@ -43,10 +60,4 @@ export default async (req) => {
       headers: { "Content-Type": "application/json" }
     });
   }
-};
-
-// CORS preflight
-export const config = {
-  path: "/api/subscribe",
-  method: ["POST", "OPTIONS"]
 };

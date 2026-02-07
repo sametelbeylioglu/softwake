@@ -456,12 +456,24 @@
   // Alarm kontrol döngüsünü başlat (ön plan kontrolü)
   startAlarmCheck();
 
+  // Push durum mesajlarını toast olarak göster
+  if (PushManager && PushManager.onStatus) {
+    PushManager.onStatus(function (msg) {
+      showToast(msg);
+    });
+  }
+
   // Push notification aboneliğini başlat
   if (PushManager && PushManager.supported()) {
-    PushManager.subscribe().then(function () {
-      // Mevcut alarmları senkronize et
-      syncAlarmsToServer();
+    PushManager.subscribe().then(function (sub) {
+      if (sub) {
+        syncAlarmsToServer();
+      } else {
+        showToast('Push bildirim etkinleştirilemedi');
+      }
     });
+  } else {
+    showToast('Bu cihaz push bildirimi desteklemiyor');
   }
 
   // URL'den tetikleme kontrolü
