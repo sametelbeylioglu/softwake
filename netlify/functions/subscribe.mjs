@@ -1,10 +1,9 @@
 // Alarm aboneliğini kaydet / güncelle
-// POST /.netlify/functions/subscribe
+// Her zaman tek bir kayıt tutulur (eski abonelikler silinir)
 
 import { getStore } from "@netlify/blobs";
 
 export default async (req) => {
-  // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", {
       headers: {
@@ -21,7 +20,7 @@ export default async (req) => {
 
   try {
     const body = await req.json();
-    const { subscription, alarms } = body;
+    const { subscription, alarms, deviceId } = body;
 
     if (!subscription || !subscription.endpoint) {
       return new Response(JSON.stringify({ error: "Missing subscription" }), {
@@ -32,21 +31,31 @@ export default async (req) => {
 
     const store = getStore("softwake-alarms");
 
-    // Subscription endpoint'i key olarak kullan
-    const key = Buffer.from(subscription.endpoint).toString("base64url").slice(0, 64);
+    // Eski tüm kayıtları sil (temiz başla)
+    try {
+      const { blobs } = await store.list();
+      for (const blob of blobs) {
+        await store.delete(blob.key);
+      }
+    } catch (e) {
+      // silme hatası kritik değil
+    }
 
+    // Tek kayıt olarak yaz
+    const key = "active";
     const record = {
       subscription,
       alarms: alarms || [],
+      deviceId: deviceId || "unknown",
       updatedAt: new Date().toISOString()
     };
 
     await store.set(key, JSON.stringify(record));
 
     const alarmCount = (alarms || []).length;
-    console.log("[subscribe] Kayıt başarılı:", key, "alarm sayısı:", alarmCount, "body keys:", Object.keys(body));
+    console.log("[subscribe] Kayıt:", alarmCount, "alarm, endpoint:", subscription.endpoint.slice(0, 40));
 
-    return new Response(JSON.stringify({ ok: true, key, receivedAlarms: alarmCount }), {
+    return new Response(JSON.stringify({ ok: true, receivedAlarms: alarmCount }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",
