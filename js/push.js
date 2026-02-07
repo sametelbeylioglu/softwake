@@ -90,25 +90,29 @@ var PushManager = (function () {
       };
     });
 
+    var payload = {
+      subscription: subscription.toJSON(),
+      alarms: utcAlarms
+    };
+
+    report('Gönderiliyor: ' + utcAlarms.length + ' alarm');
+
     try {
-      // Netlify Functions varsayılan yolu
       var response = await fetch('/.netlify/functions/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          subscription: subscription.toJSON(),
-          alarms: utcAlarms
-        })
+        body: JSON.stringify(payload)
       });
 
+      var responseText = await response.text();
+
       if (!response.ok) {
-        var errText = await response.text();
-        report('Sunucu hatası: ' + response.status + ' — ' + errText);
+        report('Sunucu hatası ' + response.status + ': ' + responseText);
         return false;
       }
 
-      var result = await response.json();
-      report('Alarmlar sunucuya kaydedildi ✓');
+      var result = JSON.parse(responseText);
+      report(utcAlarms.length + ' alarm kaydedildi ✓');
       return result.ok;
 
     } catch (err) {
